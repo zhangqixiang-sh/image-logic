@@ -330,7 +330,7 @@
     transform: scale(0.6);
   }
 
-  .emoji-wrap.vt-mirror-x {
+  .emoji-wrap.vt-mirror-y {
     transform: scaleX(-1);
   }
 
@@ -338,7 +338,7 @@
     transform: rotate(90deg);
   }
 
-  .emoji-wrap.vt-mirror-y {
+  .emoji-wrap.vt-mirror-x {
     transform: scaleY(-1);
   }
 
@@ -440,14 +440,14 @@ const EMOJIS = [
 // Emojis excluded from specific transforms (look too similar after transformation)
 const TRANSFORM_EXCLUDED_EMOJIS = {
   'mirror-x': [
+    // Top-bottom symmetric: flipping vertically looks nearly identical
+    '📘', '📗',
+  ],
+  'mirror-y': [
     // Left-right symmetric: flipping horizontally looks nearly identical
     '🍎', '🍏','🦊', '🐥', '🌻', '🦋', '🐱', 
     '🐯', '🐶', '🐻', '🎀', '🍦','🌺','🧁',
     '🐸', '🍔'
-  ],
-  'mirror-y': [
-    // Top-bottom symmetric: flipping vertically looks nearly identical
-    '📘', '📗',
   ],
   'rotate-90': [
     // Rotationally symmetric: rotated 90° looks nearly identical
@@ -469,9 +469,9 @@ const FOUR_CYCLES = [
 // Visual transforms (applied to individual emojis in Grid 3)
 const VISUAL_TRANSFORMS = [
   { id: 'shrink', cssClass: 'vt-shrink', label: '缩小' },
-  { id: 'mirror-x', cssClass: 'vt-mirror-x', label: '左右镜像' },
+  { id: 'mirror-x', cssClass: 'vt-mirror-x', label: '上下镜像' },
   { id: 'rotate-90', cssClass: 'vt-rotate-90', label: '顺时针旋转90°' },
-  { id: 'mirror-y', cssClass: 'vt-mirror-y', label: '上下镜像' },
+  { id: 'mirror-y', cssClass: 'vt-mirror-y', label: '左右镜像' },
 ];
 
 // ============ Utility Functions ============
