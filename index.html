@@ -263,6 +263,61 @@
     margin-top: 8px;
   }
 
+  /* Timer */
+  .timer-container {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .timer-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    color: #5D4037;
+  }
+
+  .timer-emoji {
+    font-size: 24px;
+    transition: transform 0.3s ease;
+  }
+
+  .timer-emoji.hurry {
+    animation: bounce 0.5s ease infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  .timer-bar {
+    width: 200px;
+    height: 8px;
+    background: #E0E0E0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .timer-progress {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    border-radius: 4px;
+    transition: width 0.1s linear;
+  }
+
+  .timer-progress.warning {
+    background: linear-gradient(90deg, #FF9800, #FFC107);
+  }
+
+  .timer-progress.danger {
+    background: linear-gradient(90deg, #F44336, #FF5722);
+  }
+
   /* Visual Transforms for Grid 3 emojis */
   .emoji-wrap {
     display: inline-block;
@@ -270,7 +325,7 @@
   }
 
   .emoji-wrap.vt-shrink {
-    transform: scale(0.55);
+    transform: scale(0.6);
   }
 
   .emoji-wrap.vt-mirror-x {
@@ -352,6 +407,16 @@
 </div>
 
 <button id="submit-btn" class="btn btn-submit" disabled onclick="handleSubmit()">提交答案</button>
+
+<div id="timer-container" class="timer-container">
+  <div class="timer-label">
+    <span id="timer-emoji" class="timer-emoji">🐢</span>
+    <span id="timer-text" class="timer-text">40秒</span>
+  </div>
+  <div class="timer-bar">
+    <div id="timer-progress" class="timer-progress"></div>
+  </div>
+</div>
 
 <div id="feedback" class="feedback"></div>
 <div id="hint" class="hint-text"></div>
@@ -589,6 +654,8 @@ let gameState = {
   usedOptionIds: new Set(),
   submitted: false,
   isCorrect: false,
+  timeLeft: 40,
+  timerInterval: null,
 };
 
 // ============ Rendering ============
@@ -747,6 +814,80 @@ function updateUI() {
   }
   renderOptions();
   updateSubmitButton();
+  updateTimerUI();
+}
+
+// ============ Timer Functions ============
+
+function startTimer() {
+  stopTimer();
+  gameState.timeLeft = 40;
+  updateTimerUI();
+  
+  gameState.timerInterval = setInterval(() => {
+    gameState.timeLeft -= 0.1;
+    
+    if (gameState.timeLeft <= 0) {
+      gameState.timeLeft = 0;
+      stopTimer();
+      autoSubmit();
+    }
+    
+    updateTimerUI();
+  }, 100);
+}
+
+function stopTimer() {
+  if (gameState.timerInterval) {
+    clearInterval(gameState.timerInterval);
+    gameState.timerInterval = null;
+  }
+}
+
+function updateTimerUI() {
+  const progress = document.getElementById('timer-progress');
+  const timerText = document.getElementById('timer-text');
+  const timerEmoji = document.getElementById('timer-emoji');
+  
+  if (!progress || !timerText || !timerEmoji) return;
+  
+  const percent = (gameState.timeLeft / 40) * 100;
+  progress.style.width = percent + '%';
+  timerText.textContent = Math.ceil(gameState.timeLeft) + '秒';
+  
+  // Change emoji at 20 seconds
+  if (gameState.timeLeft <= 20) {
+    timerEmoji.textContent = '🐰';
+    timerEmoji.classList.add('hurry');
+    progress.classList.add('warning');
+    progress.classList.remove('danger');
+  } else {
+    timerEmoji.textContent = '🐢';
+    timerEmoji.classList.remove('hurry');
+    progress.classList.remove('warning');
+    progress.classList.remove('danger');
+  }
+  
+  if (gameState.timeLeft <= 10) {
+    progress.classList.add('danger');
+    progress.classList.remove('warning');
+  }
+}
+
+function autoSubmit() {
+  if (gameState.submitted) return;
+  
+  gameState.submitted = true;
+  gameState.isCorrect = false;
+  stopTimer();
+  updateUI();
+  
+  const fb = document.getElementById('feedback');
+  const hint = document.getElementById('hint');
+  
+  fb.className = 'feedback wrong';
+  fb.textContent = '时间到!';
+  hint.textContent = '别灰心，再试一题吧';
 }
 
 // ============ Interaction Handlers ============
@@ -790,6 +931,8 @@ function handleSubmit() {
     handleNewPuzzle();
     return;
   }
+  
+  stopTimer();
 
   // Validate: check if each position has the correct option (both emoji AND visual treatment)
   const correctOpts = gameState.puzzle.correctOptions;
@@ -832,6 +975,7 @@ function resetAnswer() {
   gameState.submitted = false;
   gameState.isCorrect = false;
   updateUI();
+  startTimer();
 }
 
 function handleNewPuzzle() {
@@ -849,6 +993,8 @@ function handleNewPuzzle() {
     usedOptionIds: new Set(),
     submitted: false,
     isCorrect: false,
+    timeLeft: 40,
+    timerInterval: null,
   };
 
   const fb = document.getElementById('feedback');
@@ -863,6 +1009,7 @@ function handleNewPuzzle() {
   container.style.animation = 'fadeIn 0.3s ease-out';
 
   updateUI();
+  startTimer();
 }
 
 // ============ Confetti Effect ============
