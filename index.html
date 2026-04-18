@@ -127,11 +127,11 @@
   }
 
   .grid-2x2.demo-answer {
-    background: var(--demo-answer-bg);
+    background: white;
   }
 
   .grid-2x2.demo-answer .grid-cell {
-    background: rgba(255,255,255,0.6);
+    background: #FAFAFA;
   }
 
   .grid-2x2.question-answer {
@@ -392,15 +392,15 @@ const VISUAL_TRANSFORMS = [
 const TRANSFORM_EXCLUDED_EMOJIS = {
   'mirror-x': [
     // Left-right symmetric: flipping horizontally looks nearly identical
-    '🍎', '🐯', '', '🌻', '', '🦋', '', '🎈', '', '🌮', '',
+    '🍎', '🦊', '🐥', '🌻', '🦋', '🐱', '🐯', '🐶', '🐻', '🎀', '🍦','🌺','🧁'
   ],
   'mirror-y': [
     // Top-bottom symmetric: flipping vertically looks nearly identical
-    '🍎', '🐸', '🦋', '🎲', '🧩', '🍒', '🎀', '🚕',
+    '📘', '📗',
   ],
   'rotate-90': [
     // Rotationally symmetric: rotated 90° looks nearly identical
-    '🍎', '🍏', '🌸', '🌻', '🌼', '',
+    '🌸', '🌼', '🎲',
   ],
   // 'shrink' has no exclusions — size change is always visible
 };
