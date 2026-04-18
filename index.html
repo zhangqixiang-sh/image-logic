@@ -123,6 +123,7 @@
     border-radius: 4px;
     border: 1px solid #E0E0E0;
     user-select: none;
+    overflow: visible;
   }
 
   .grid-2x2.demo-answer {
@@ -260,6 +261,28 @@
     margin-top: 8px;
   }
 
+  /* Visual Transforms for Grid 3 emojis */
+  .emoji-wrap {
+    display: inline-block;
+    transform-origin: center center;
+  }
+
+  .emoji-wrap.vt-shrink {
+    transform: scale(0.55);
+  }
+
+  .emoji-wrap.vt-mirror-x {
+    transform: scaleX(-1);
+  }
+
+  .emoji-wrap.vt-rotate-90 {
+    transform: rotate(90deg);
+  }
+
+  .emoji-wrap.vt-mirror-y {
+    transform: scaleY(-1);
+  }
+
   /* Animations */
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
@@ -335,26 +358,53 @@
 // ============ Constants ============
 const POSITIONS = ['TL', 'TR', 'BL', 'BR'];
 
-const EMOJI_PAIRS = [
-  ['🍎', '🍏'], ['🔴', '🟠'], ['💙', '💜'], ['🌸', '🌺'],
-  ['⭐', '🌟'], ['🍊', '🍑'], ['🐸', '🐢'], ['🟡', '🟢'],
-  ['🌻', '🌼'], ['🍓', '🍒'], ['💛', '💚'], ['🟦', '🟪'],
-  ['🍋', '🍐'], ['🐱', '🐯'], ['🐶', '🐻'], ['🎈', '🎀'],
-  ['🌍', '🌕'], ['🏀', '🥎'], ['🎵', '🎶'], ['🍔', '🌮'],
-  ['🚗', '🚕'], ['📘', '📗'], ['🧩', '🎲'], ['🍦', '🧁'],
+// Flat list of asymmetric emojis (rotations/mirrors must be visually distinct)
+const EMOJIS = [
+  '🍎', '🍏', '🦊', '🐺', '🐧', '🐥', '🌸', '🌺',
+  '🎺', '🎷', '🍊', '🍑', '🐸', '🐢', '🦋', '🐛',
+  '🌻', '🌼', '🍓', '🍒', '🚀', '🚁', '🎸', '🎻',
+  '🍋', '🍐', '🐱', '🐯', '🐶', '🐻', '🎈', '🎀',
+  '🦜', '🦩', '🌶️', '🥕', '🎵', '🎶', '🍔', '🌮',
+  '🚗', '🚕', '📘', '📗', '🧩', '🎲', '🍦', '🧁',
 ];
 
 // All 6 four-cycles on positions {TL=0, TR=1, BL=2, BR=3}
-// P[i] = j means icon at position i moves to position j
-// Using 4-cycles ensures: no fixed points, Grid3 != Grid1, good variety
 const FOUR_CYCLES = [
-  [1, 2, 3, 0], // TL->TR->BL->BR->TL (Z)
-  [1, 3, 0, 2], // TL->TR->BR->BL->TL (clockwise)
-  [2, 3, 1, 0], // TL->BL->TR->BR->TL
-  [2, 0, 3, 1], // TL->BL->BR->TR->TL (counter-clockwise)
-  [3, 2, 0, 1], // TL->BR->BL->TR->TL
-  [3, 0, 1, 2], // TL->BR->TR->BL->TL
+  [1, 2, 3, 0],
+  [1, 3, 0, 2],
+  [2, 3, 1, 0],
+  [2, 0, 3, 1],
+  [3, 2, 0, 1],
+  [3, 0, 1, 2],
 ];
+
+// Visual transforms (applied to individual emojis in Grid 3)
+const VISUAL_TRANSFORMS = [
+  { id: 'shrink', cssClass: 'vt-shrink', label: '缩小' },
+  { id: 'mirror-x', cssClass: 'vt-mirror-x', label: '左右镜像' },
+  { id: 'rotate-90', cssClass: 'vt-rotate-90', label: '顺时针旋转90°' },
+  { id: 'mirror-y', cssClass: 'vt-mirror-y', label: '上下镜像' },
+];
+
+// Emojis excluded from specific transforms (look too similar after transformation)
+const TRANSFORM_EXCLUDED_EMOJIS = {
+  'mirror-x': [
+    // Left-right symmetric: flipped looks nearly identical
+    '🍎', '🍏', '🌸', '🌺', '🌻', '🌼', '🍓', '🐸', '🦋',
+    '🎈', '🍔', '🧁', '🍦', '🍊', '🍑', '🍋', '🎀', '🎲',
+    '🐛', '🍒', '🐢', '🌮', '🥕',
+  ],
+  'mirror-y': [
+    // Top-bottom symmetric: flipped vertically looks nearly identical
+    '🍎', '🍏', '🍊', '🍋', '🐸', '🦋', '🎲', '🧩',
+    '🍒', '🎀', '🚗', '🚕',
+  ],
+  'rotate-90': [
+    // Rotationally symmetric: rotated 90° looks nearly identical
+    '🍎', '🍏', '🍊', '🍋', '🎲', '🌸', '🌼',
+  ],
+  // 'shrink' has no exclusions — size change is always visible
+};
 
 // ============ Utility Functions ============
 function shuffle(arr) {
@@ -382,44 +432,137 @@ function applyPermutation(grid, perm) {
   return newGrid;
 }
 
+// Check if an emoji is compatible with a given transform
+function isEmojiCompatible(emoji, transformId) {
+  const excluded = TRANSFORM_EXCLUDED_EMOJIS[transformId];
+  if (!excluded) return true; // e.g. 'shrink' has no exclusions
+  return !excluded.includes(emoji);
+}
+
+// Pick numRules compatible transform-position pairs for grid3
+function pickCompatibleTransforms(numRules, grid3) {
+  const shuffledTransforms = shuffle([...VISUAL_TRANSFORMS]);
+  const shuffledPositions = shuffle([...POSITIONS]);
+  const result = [];
+  const usedTransformIds = new Set();
+  const usedPositions = new Set();
+
+  for (const t of shuffledTransforms) {
+    if (result.length >= numRules) break;
+    if (usedTransformIds.has(t.id)) continue;
+    for (const pos of shuffledPositions) {
+      if (usedPositions.has(pos)) continue;
+      if (isEmojiCompatible(grid3[pos], t.id)) {
+        result.push({ position: pos, transform: t });
+        usedTransformIds.add(t.id);
+        usedPositions.add(pos);
+        break;
+      }
+    }
+  }
+  return result.length >= numRules ? result : null;
+}
+
 function generatePuzzle() {
-  // Each row uses a different set of 4 emojis (12 pairs total)
-  const allSelectedPairs = pickRandom(EMOJI_PAIRS, 12);
-  const rowPairs = [
-    allSelectedPairs.slice(0, 4),
-    allSelectedPairs.slice(4, 8),
-    allSelectedPairs.slice(8, 12),
+  // Pick 12 unique emojis (4 per row)
+  const allSelected = pickRandom(EMOJIS, 12);
+  const rowEmojis = [
+    allSelected.slice(0, 4),
+    allSelected.slice(4, 8),
+    allSelected.slice(8, 12),
   ];
 
-  // Pick a random 4-cycle as the movement pattern (same for all rows)
+  // Pick a random 4-cycle as the movement pattern (same for all rows, all emojis)
   const perm = FOUR_CYCLES[Math.floor(Math.random() * FOUR_CYCLES.length)];
+
+  // Pre-compute row 3's grid3 first to check transform compatibility
+  const row3Shuffled = shuffle([...rowEmojis[2]]);
+  const row3Grid1 = { TL: row3Shuffled[0], TR: row3Shuffled[1], BL: row3Shuffled[2], BR: row3Shuffled[3] };
+  const row3Grid2 = applyPermutation(row3Grid1, perm);
+  const grid3 = applyPermutation(row3Grid2, perm);
+
+  // Pick 1-2 unique visual transform rules compatible with grid3 emojis
+  const numRules = Math.random() < 0.5 ? 1 : 2;
+  const transformRules = pickCompatibleTransforms(numRules, grid3);
+
+  // If we couldn't find compatible transforms, signal to retry
+  if (!transformRules) return null;
 
   const rows = [];
   for (let i = 0; i < 3; i++) {
-    const emojis = rowPairs[i].map(p => p[0]);
-    // Random initial arrangement for Grid 1
-    const shuffled = shuffle([...emojis]);
-    const grid1 = { TL: shuffled[0], TR: shuffled[1], BL: shuffled[2], BR: shuffled[3] };
-    // Grid 2 and 3 are derived by applying the permutation
-    const grid2 = applyPermutation(grid1, perm);
-    const grid3 = applyPermutation(grid2, perm);
-    rows.push({ grid1, grid2, grid3 });
+    const emojis = rowEmojis[i];
+    let grid1, grid2, g3;
+    if (i === 2) {
+      grid1 = row3Grid1;
+      grid2 = row3Grid2;
+      g3 = grid3;
+    } else {
+      const shuffled = shuffle([...emojis]);
+      grid1 = { TL: shuffled[0], TR: shuffled[1], BL: shuffled[2], BR: shuffled[3] };
+      grid2 = applyPermutation(grid1, perm);
+      g3 = applyPermutation(grid2, perm);
+    }
+    const grid3Final = g3;
+
+    // Precompute which positions in grid3 have visual transforms (position-based)
+    const grid3Transforms = {};
+    for (const rule of transformRules) {
+      grid3Transforms[rule.position] = rule.transform;
+    }
+
+    rows.push({ grid1, grid2, grid3: grid3Final, emojis, grid3Transforms });
   }
 
-  // Options come from row 3's emoji pairs: 4 correct + 4 confusers
-  const row3Pairs = rowPairs[2];
+  // ---- New options system: visual variant confusers ----
+  // For each answer emoji, create:
+  //   - Correct option: emoji with its correct visual treatment (transform or normal)
+  //   - Confuser option: same emoji with WRONG visual treatment
+  const row3Emojis = rows[2].emojis;
+  const answerGrid = rows[2].grid3;
   const options = [];
-  row3Pairs.forEach(([primary, confuser]) => {
-    options.push({ emoji: primary, isCorrect: true, id: 'p_' + primary });
-    options.push({ emoji: confuser, isCorrect: false, id: 'c_' + confuser });
-  });
+  const correctOptions = {}; // pos → correct option id
+
+  let optIdx = 0;
+  for (const pos of POSITIONS) {
+    const emoji = answerGrid[pos];
+    const rule = transformRules.find(r => r.position === pos);
+    const correctTransform = rule ? rule.transform : null;
+
+    // Correct option: emoji with its correct visual treatment
+    const correctId = `opt_${optIdx++}`;
+    options.push({
+      emoji,
+      transform: correctTransform,
+      isCorrect: true,
+      id: correctId,
+    });
+    correctOptions[pos] = correctId;
+
+    // Confuser option: same emoji with WRONG visual treatment
+    let confuserTransform;
+    if (correctTransform) {
+      // Correct has a transform → confuser is the normal (untransformed) version
+      confuserTransform = null;
+    } else {
+      // Correct is normal → confuser has a random transform applied
+      confuserTransform = VISUAL_TRANSFORMS[Math.floor(Math.random() * VISUAL_TRANSFORMS.length)];
+    }
+    const confuserId = `opt_${optIdx++}`;
+    options.push({
+      emoji,
+      transform: confuserTransform,
+      isCorrect: false,
+      id: confuserId,
+    });
+  }
 
   return {
     rows,
     perm,
-    emojiPairs: row3Pairs,
+    transformRules,
     options: shuffle(options),
-    answerGrid: rows[2].grid3,
+    answerGrid,
+    correctOptions,
   };
 }
 
@@ -431,6 +574,10 @@ function validatePuzzle(puzzle) {
     for (const p of POSITIONS) {
       if (g2[p] !== row.grid2[p] || g3[p] !== row.grid3[p]) return false;
     }
+    for (const grid of [row.grid1, row.grid2, row.grid3]) {
+      const vals = new Set(POSITIONS.map(p => grid[p]));
+      if (vals.size !== 4) return false;
+    }
   }
   return true;
 }
@@ -439,7 +586,7 @@ function validatePuzzle(puzzle) {
 let gameState = {
   puzzle: null,
   selectedOptionId: null,
-  userAnswer: { TL: null, TR: null, BL: null, BR: null },
+  userAnswer: { TL: null, TR: null, BL: null, BR: null }, // stores option IDs
   usedOptionIds: new Set(),
   submitted: false,
   isCorrect: false,
@@ -447,25 +594,38 @@ let gameState = {
 
 // ============ Rendering ============
 
-function renderGrid(grid, extraClass = '') {
+// Wrap emoji in a span with optional visual transform class
+function wrapEmoji(emoji, transform) {
+  if (transform) {
+    return `<span class="emoji-wrap ${transform.cssClass}">${emoji}</span>`;
+  }
+  return emoji;
+}
+
+function renderGrid(grid, extraClass = '', grid3Transforms = null) {
   const cls = extraClass ? ` ${extraClass}` : '';
+  const w = (pos) => wrapEmoji(grid[pos], grid3Transforms ? grid3Transforms[pos] || null : null);
   return `<div class="grid-2x2${cls}">
-    <div class="grid-cell">${grid.TL}</div>
-    <div class="grid-cell">${grid.TR}</div>
-    <div class="grid-cell">${grid.BL}</div>
-    <div class="grid-cell">${grid.BR}</div>
+    <div class="grid-cell">${w('TL')}</div>
+    <div class="grid-cell">${w('TR')}</div>
+    <div class="grid-cell">${w('BL')}</div>
+    <div class="grid-cell">${w('BR')}</div>
   </div>`;
 }
 
 function renderAnswerGrid() {
-  const ans = gameState.userAnswer;
+  const ans = gameState.userAnswer; // stores option IDs
+  const puzzle = gameState.puzzle;
   const cells = POSITIONS.map(p => {
-    const emoji = ans[p];
-    const filledClass = emoji ? ' filled' : '';
+    const optId = ans[p];
+    const opt = optId ? puzzle.options.find(o => o.id === optId) : null;
+    const filledClass = opt ? ' filled' : '';
     const feedbackClass = gameState.submitted
-      ? (emoji === gameState.puzzle.answerGrid[p] ? ' correct' : ' wrong')
+      ? (optId === puzzle.correctOptions[p] ? ' correct' : ' wrong')
       : '';
-    const display = emoji || '<span class="question-mark">?</span>';
+    const display = opt
+      ? wrapEmoji(opt.emoji, opt.transform)
+      : '<span class="question-mark">?</span>';
     return `<div class="grid-cell${filledClass}${feedbackClass}" data-pos="${p}" onclick="handleSlotClick('${p}')">${display}</div>`;
   }).join('');
   return `<div class="grid-2x2 question-answer">${cells}</div>`;
@@ -477,7 +637,7 @@ function renderRow(row, index, isQuestion) {
   const g2 = renderGrid(row.grid2);
   const g3 = isQuestion
     ? renderAnswerGrid()
-    : renderGrid(row.grid3, 'demo-answer');
+    : renderGrid(row.grid3, 'demo-answer', row.grid3Transforms);
 
   return `<div class="puzzle-row">
     <div class="row-label">${label}</div>
@@ -504,8 +664,10 @@ function renderOptions() {
   container.innerHTML = gameState.puzzle.options.map((opt, i) => {
     const selected = gameState.selectedOptionId === opt.id ? ' selected' : '';
     const used = gameState.usedOptionIds.has(opt.id) ? ' used' : '';
+    // Each option carries its own visual treatment (transform or null)
+    const emojiDisplay = wrapEmoji(opt.emoji, opt.transform);
     return `<div class="option-card${selected}${used}" data-id="${opt.id}" onclick="handleOptionClick('${opt.id}')">
-      <span class="option-emoji">${opt.emoji}</span>
+      <span class="option-emoji">${emojiDisplay}</span>
       <span class="option-num">${nums[i]}</span>
     </div>`;
   }).join('');
@@ -550,12 +712,11 @@ function handleOptionClick(optId) {
 function handleSlotClick(pos) {
   if (gameState.submitted) return;
 
-  const currentEmoji = gameState.userAnswer[pos];
+  const currentOptId = gameState.userAnswer[pos];
 
-  if (currentEmoji !== null) {
-    // Remove from slot, return to options
-    const opt = gameState.puzzle.options.find(o => o.emoji === currentEmoji && gameState.usedOptionIds.has(o.id));
-    if (opt) gameState.usedOptionIds.delete(opt.id);
+  if (currentOptId !== null) {
+    // Remove option from slot, return to options pool
+    gameState.usedOptionIds.delete(currentOptId);
     gameState.userAnswer[pos] = null;
     updateUI();
     return;
@@ -563,11 +724,9 @@ function handleSlotClick(pos) {
 
   if (gameState.selectedOptionId === null) return;
 
-  const selectedOpt = gameState.puzzle.options.find(o => o.id === gameState.selectedOptionId);
-  if (!selectedOpt) return;
-
-  gameState.userAnswer[pos] = selectedOpt.emoji;
-  gameState.usedOptionIds.add(selectedOpt.id);
+  // Place selected option at this position
+  gameState.userAnswer[pos] = gameState.selectedOptionId;
+  gameState.usedOptionIds.add(gameState.selectedOptionId);
   gameState.selectedOptionId = null;
   updateUI();
 }
@@ -578,10 +737,11 @@ function handleSubmit() {
     return;
   }
 
-  const answer = gameState.puzzle.answerGrid;
+  // Validate: check if each position has the correct option (both emoji AND visual treatment)
+  const correctOpts = gameState.puzzle.correctOptions;
   let allCorrect = true;
   for (const p of POSITIONS) {
-    if (gameState.userAnswer[p] !== answer[p]) {
+    if (gameState.userAnswer[p] !== correctOpts[p]) {
       allCorrect = false;
     }
   }
@@ -599,7 +759,7 @@ function handleSubmit() {
     hint.textContent = '';
     createConfetti();
   } else {
-    const correctCount = POSITIONS.filter(p => gameState.userAnswer[p] === answer[p]).length;
+    const correctCount = POSITIONS.filter(p => gameState.userAnswer[p] === correctOpts[p]).length;
     fb.className = 'feedback wrong';
     fb.textContent = `还差一点! ${correctCount}/4 个位置正确`;
     hint.textContent = '2秒后可以重试...';
@@ -626,7 +786,7 @@ function handleNewPuzzle() {
   do {
     puzzle = generatePuzzle();
     attempts++;
-  } while (!validatePuzzle(puzzle) && attempts < 10);
+  } while ((!puzzle || !validatePuzzle(puzzle)) && attempts < 50);
 
   gameState = {
     puzzle,
