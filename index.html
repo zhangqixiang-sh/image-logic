@@ -379,6 +379,13 @@
     100% { opacity: 0; transform: translateY(400px) rotate(720deg); }
   }
 
+  .version-footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 12px;
+    color: #999;
+  }
+
   /* Responsive */
   @media (max-width: 600px) {
     :root {
@@ -422,6 +429,8 @@
 
 <div id="feedback" class="feedback"></div>
 <div id="hint" class="hint-text"></div>
+
+<div class="version-footer">v1.0.0</div>
 
 <script>
 // ============ Constants ============
@@ -664,7 +673,7 @@ let gameState = {
   usedOptionIds: new Set(),
   submitted: false,
   isCorrect: false,
-  timeLeft: 45,
+  timeLeft: 60,
   timerInterval: null,
 };
 
@@ -834,7 +843,7 @@ function updateUI() {
 
 function startTimer() {
   stopTimer();
-  gameState.timeLeft = 45;
+  gameState.timeLeft = 60;
   updateTimerUI();
   
   gameState.timerInterval = setInterval(() => {
@@ -864,12 +873,12 @@ function updateTimerUI() {
   
   if (!progress || !timerText || !timerEmoji) return;
   
-  const percent = (gameState.timeLeft / 45) * 100;
+  const percent = (gameState.timeLeft / 60) * 100;
   progress.style.width = percent + '%';
   timerText.textContent = Math.ceil(gameState.timeLeft) + '秒';
   
-  // Change emoji at 30 seconds
-  if (gameState.timeLeft <= 30) {
+  // Change emoji at 45 seconds
+  if (gameState.timeLeft <= 45) {
     timerEmoji.textContent = '🐰';
     timerEmoji.classList.add('hurry');
     progress.classList.add('warning');
@@ -881,7 +890,7 @@ function updateTimerUI() {
     progress.classList.remove('danger');
   }
   
-  if (gameState.timeLeft <= 10) {
+  if (gameState.timeLeft <= 15) {
     progress.classList.add('danger');
     progress.classList.remove('warning');
   }
@@ -992,6 +1001,9 @@ function resetAnswer() {
 }
 
 function handleNewPuzzle() {
+  // Stop existing timer BEFORE resetting gameState
+  stopTimer();
+
   let puzzle;
   let attempts = 0;
   do {
@@ -1006,7 +1018,7 @@ function handleNewPuzzle() {
     usedOptionIds: new Set(),
     submitted: false,
     isCorrect: false,
-    timeLeft: 45,
+    timeLeft: 60,
     timerInterval: null,
   };
 
@@ -1021,7 +1033,13 @@ function handleNewPuzzle() {
   container.offsetHeight; // trigger reflow
   container.style.animation = 'fadeIn 0.3s ease-out';
 
-  updateUI();
+  // Clear options to force full re-render
+  document.getElementById('options-grid').innerHTML = '';
+
+  renderPuzzle();
+  renderOptions();
+  updateSubmitButton();
+  updateTimerUI();
   startTimer();
 }
 
