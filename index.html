@@ -352,7 +352,7 @@
 <button id="submit-btn" class="btn btn-submit" disabled onclick="handleSubmit()">提交答案</button>
 
 <div id="feedback" class="feedback"></div>
-<div id="hint" class="hint-text">观察前两行的规律，找出第三行答案格中应该填什么图案</div>
+<div id="hint" class="hint-text"></div>
 
 <script>
 // ============ Constants ============
@@ -389,19 +389,16 @@ const VISUAL_TRANSFORMS = [
 // Emojis excluded from specific transforms (look too similar after transformation)
 const TRANSFORM_EXCLUDED_EMOJIS = {
   'mirror-x': [
-    // Left-right symmetric: flipped looks nearly identical
-    '🍎', '🍏', '🌸', '🌺', '🌻', '🌼', '🍓', '🐸', '🦋',
-    '🎈', '🍔', '🧁', '🍦', '🍊', '🍑', '🍋', '🎀', '🎲',
-    '🐛', '🍒', '🐢', '🌮', '🥕',
+    // Left-right symmetric: flipping horizontally looks nearly identical
+    '🍎', '🐯', '', '🌻', '', '🦋', '', '🎈', '', '🌮', '',
   ],
   'mirror-y': [
-    // Top-bottom symmetric: flipped vertically looks nearly identical
-    '🍎', '🍏', '🍊', '🍋', '🐸', '🦋', '🎲', '🧩',
-    '🍒', '🎀', '🚗', '🚕',
+    // Top-bottom symmetric: flipping vertically looks nearly identical
+    '🍎', '🐸', '🦋', '🎲', '🧩', '🍒', '🎀', '🚕',
   ],
   'rotate-90': [
     // Rotationally symmetric: rotated 90° looks nearly identical
-    '🍎', '🍏', '🍊', '🍋', '🎲', '🌸', '🌼',
+    '🍎', '🍏', '🌸', '🌻', '🌼', '',
   ],
   // 'shrink' has no exclusions — size change is always visible
 };
@@ -798,7 +795,7 @@ function handleNewPuzzle() {
   const hint = document.getElementById('hint');
   fb.textContent = '';
   fb.className = 'feedback';
-  hint.textContent = '观察前两行的规律，找出第三行答案格中应该填什么图案';
+  hint.textContent = '';
 
   const container = document.getElementById('puzzle-container');
   container.style.animation = 'none';
