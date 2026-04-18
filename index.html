@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图形推理挑战</title>
+<style>
+  :root {
+    --grid-size: 60px;
+    --grid-gap: 3px;
+    --grid-border: #795548;
+    --grid-inner: #BCAAA4;
+    --bg-start: #FFF8E7;
+    --bg-end: #FFF0D4;
+    --demo-answer-bg: #E8F5E9;
+    --question-bg: #FFF9C4;
+    --selected-border: #2196F3;
+    --selected-bg: #E3F2FD;
+    --correct-color: #4CAF50;
+    --wrong-color: #F44336;
+    --font-emoji: 30px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    color: #333;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .header h1 {
+    font-size: 24px;
+    color: #5D4037;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .btn:active { transform: translateY(0); }
+
+  .btn-refresh {
+    background: #FF9800;
+    color: white;
+    font-size: 16px;
+  }
+
+  .btn-submit {
+    background: #9E9E9E;
+    color: white;
+    font-size: 16px;
+    padding: 10px 32px;
+    margin-top: 16px;
+  }
+
+  .btn-submit.active {
+    background: var(--correct-color);
+  }
+
+  .btn-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .puzzle-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .puzzle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .row-label {
+    font-size: 13px;
+    color: #8D6E63;
+    width: 50px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .grid-2x2 {
+    display: grid;
+    grid-template-columns: var(--grid-size) var(--grid-size);
+    grid-template-rows: var(--grid-size) var(--grid-size);
+    gap: var(--grid-gap);
+    border: 2px solid var(--grid-border);
+    border-radius: 8px;
+    padding: 3px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .grid-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-emoji);
+    background: #FAFAFA;
+    border-radius: 4px;
+    border: 1px solid #E0E0E0;
+    user-select: none;
+  }
+
+  .grid-2x2.demo-answer {
+    background: var(--demo-answer-bg);
+  }
+
+  .grid-2x2.demo-answer .grid-cell {
+    background: rgba(255,255,255,0.6);
+  }
+
+  .grid-2x2.question-answer {
+    background: var(--question-bg);
+  }
+
+  .grid-2x2.question-answer .grid-cell {
+    background: rgba(255,255,255,0.6);
+    cursor: pointer;
+    transition: all 0.15s;
+    min-height: var(--grid-size);
+  }
+
+  .grid-2x2.question-answer .grid-cell:hover {
+    background: rgba(255,255,255,0.9);
+    border-color: var(--selected-border);
+  }
+
+  .grid-2x2.question-answer .grid-cell.filled {
+    background: rgba(255,255,255,0.85);
+  }
+
+  .grid-2x2.question-answer .grid-cell.correct {
+    border: 2px solid var(--correct-color);
+    background: #E8F5E9;
+  }
+
+  .grid-2x2.question-answer .grid-cell.wrong {
+    border: 2px solid var(--wrong-color);
+    background: #FFEBEE;
+    animation: shake 0.4s ease-in-out;
+  }
+
+  .arrow {
+    font-size: 24px;
+    color: #78909C;
+    margin: 0 4px;
+    flex-shrink: 0;
+  }
+
+  .question-mark {
+    font-size: 22px;
+    color: #BDBDBD;
+  }
+
+  /* Options */
+  .options-section {
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .options-label {
+    font-size: 14px;
+    color: #8D6E63;
+    margin-bottom: 10px;
+  }
+
+  .options-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .option-card {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #E0E0E0;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    position: relative;
+  }
+
+  .option-card:hover {
+    border-color: #90CAF9;
+    box-shadow: 0 2px 8px rgba(33,150,243,0.2);
+  }
+
+  .option-card.selected {
+    border-color: var(--selected-border);
+    background: var(--selected-bg);
+    transform: scale(1.08);
+    box-shadow: 0 3px 10px rgba(33,150,243,0.3);
+  }
+
+  .option-card.used {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .option-card .option-emoji {
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .option-card .option-num {
+    font-size: 10px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  /* Feedback */
+  .feedback {
+    margin-top: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    min-height: 30px;
+    text-align: center;
+  }
+
+  .feedback.correct { color: var(--correct-color); }
+  .feedback.wrong { color: var(--wrong-color); }
+
+  .hint-text {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Animations */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .puzzle-container { animation: fadeIn 0.3s ease-out; }
+
+  .confetti-piece {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1000;
+    animation: confettiFall 1.5s ease-out forwards;
+  }
+
+  @keyframes confettiFall {
+    0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(400px) rotate(720deg); }
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    :root {
+      --grid-size: 48px;
+      --font-emoji: 24px;
+    }
+    .header h1 { font-size: 18px; }
+    .row-label { width: 36px; font-size: 11px; }
+    .puzzle-row { gap: 6px; }
+    .option-card { width: 54px; height: 54px; }
+    .option-card .option-emoji { font-size: 22px; }
+    .arrow { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>图形推理挑战</h1>
+  <button class="btn btn-refresh" onclick="handleNewPuzzle()" title="换一题">换一题</button>
+</div>
+
+<div id="puzzle-container" class="puzzle-container"></div>
+
+<div class="options-section">
+  <div class="options-label">从下面选择图案，点击填入答案格:</div>
+  <div id="options-grid" class="options-grid"></div>
+</div>
+
+<button id="submit-btn" class="btn btn-submit" disabled onclick="handleSubmit()">提交答案</button>
+
+<div id="feedback" class="feedback"></div>
+<div id="hint" class="hint-text">观察前两行的规律，找出第三行答案格中应该填什么图案</div>
+
+<script>
+// ============ Constants ============
+const POSITIONS = ['TL', 'TR', 'BL', 'BR'];
+
+const EMOJI_PAIRS = [
+  ['🍎', '🍏'], ['🔴', '🟠'], ['💙', '💜'], ['🌸', '🌺'],
+  ['⭐', '🌟'], ['🍊', '🍑'], ['🐸', '🐢'], ['🟡', '🟢'],
+  ['🌻', '🌼'], ['🍓', '🍒'], ['💛', '💚'], ['🟦', '🟪'],
+  ['🍋', '🍐'], ['🐱', '🐯'], ['🐶', '🐻'], ['🎈', '🎀'],
+  ['🌍', '🌕'], ['🏀', '🥎'], ['🎵', '🎶'], ['🍔', '🌮'],
+  ['🚗', '🚕'], ['📘', '📗'], ['🧩', '🎲'], ['🍦', '🧁'],
+];
+
+// All 6 four-cycles on positions {TL=0, TR=1, BL=2, BR=3}
+// P[i] = j means icon at position i moves to position j
+// Using 4-cycles ensures: no fixed points, Grid3 != Grid1, good variety
+const FOUR_CYCLES = [
+  [1, 2, 3, 0], // TL->TR->BL->BR->TL (Z)
+  [1, 3, 0, 2], // TL->TR->BR->BL->TL (clockwise)
+  [2, 3, 1, 0], // TL->BL->TR->BR->TL
+  [2, 0, 3, 1], // TL->BL->BR->TR->TL (counter-clockwise)
+  [3, 2, 0, 1], // TL->BR->BL->TR->TL
+  [3, 0, 1, 2], // TL->BR->TR->BL->TL
+];
+
+// ============ Utility Functions ============
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickRandom(arr, n) {
+  return shuffle(arr).slice(0, n);
+}
+
+// ============ Core Generation Logic ============
+
+// Apply position permutation: icon at position i moves to position perm[i]
+function applyPermutation(grid, perm) {
+  const pos = POSITIONS;
+  const newGrid = {};
+  for (let i = 0; i < 4; i++) {
+    newGrid[pos[perm[i]]] = grid[pos[i]];
+  }
+  return newGrid;
+}
+
+function generatePuzzle() {
+  // Each row uses a different set of 4 emojis (12 pairs total)
+  const allSelectedPairs = pickRandom(EMOJI_PAIRS, 12);
+  const rowPairs = [
+    allSelectedPairs.slice(0, 4),
+    allSelectedPairs.slice(4, 8),
+    allSelectedPairs.slice(8, 12),
+  ];
+
+  // Pick a random 4-cycle as the movement pattern (same for all rows)
+  const perm = FOUR_CYCLES[Math.floor(Math.random() * FOUR_CYCLES.length)];
+
+  const rows = [];
+  for (let i = 0; i < 3; i++) {
+    const emojis = rowPairs[i].map(p => p[0]);
+    // Random initial arrangement for Grid 1
+    const shuffled = shuffle([...emojis]);
+    const grid1 = { TL: shuffled[0], TR: shuffled[1], BL: shuffled[2], BR: shuffled[3] };
+    // Grid 2 and 3 are derived by applying the permutation
+    const grid2 = applyPermutation(grid1, perm);
+    const grid3 = applyPermutation(grid2, perm);
+    rows.push({ grid1, grid2, grid3 });
+  }
+
+  // Options come from row 3's emoji pairs: 4 correct + 4 confusers
+  const row3Pairs = rowPairs[2];
+  const options = [];
+  row3Pairs.forEach(([primary, confuser]) => {
+    options.push({ emoji: primary, isCorrect: true, id: 'p_' + primary });
+    options.push({ emoji: confuser, isCorrect: false, id: 'c_' + confuser });
+  });
+
+  return {
+    rows,
+    perm,
+    emojiPairs: row3Pairs,
+    options: shuffle(options),
+    answerGrid: rows[2].grid3,
+  };
+}
+
+// Self-validation
+function validatePuzzle(puzzle) {
+  for (const row of puzzle.rows) {
+    const g2 = applyPermutation(row.grid1, puzzle.perm);
+    const g3 = applyPermutation(g2, puzzle.perm);
+    for (const p of POSITIONS) {
+      if (g2[p] !== row.grid2[p] || g3[p] !== row.grid3[p]) return false;
+    }
+  }
+  return true;
+}
+
+// ============ Game State ============
+let gameState = {
+  puzzle: null,
+  selectedOptionId: null,
+  userAnswer: { TL: null, TR: null, BL: null, BR: null },
+  usedOptionIds: new Set(),
+  submitted: false,
+  isCorrect: false,
+};
+
+// ============ Rendering ============
+
+function renderGrid(grid, extraClass = '') {
+  const cls = extraClass ? ` ${extraClass}` : '';
+  return `<div class="grid-2x2${cls}">
+    <div class="grid-cell">${grid.TL}</div>
+    <div class="grid-cell">${grid.TR}</div>
+    <div class="grid-cell">${grid.BL}</div>
+    <div class="grid-cell">${grid.BR}</div>
+  </div>`;
+}
+
+function renderAnswerGrid() {
+  const ans = gameState.userAnswer;
+  const cells = POSITIONS.map(p => {
+    const emoji = ans[p];
+    const filledClass = emoji ? ' filled' : '';
+    const feedbackClass = gameState.submitted
+      ? (emoji === gameState.puzzle.answerGrid[p] ? ' correct' : ' wrong')
+      : '';
+    const display = emoji || '<span class="question-mark">?</span>';
+    return `<div class="grid-cell${filledClass}${feedbackClass}" data-pos="${p}" onclick="handleSlotClick('${p}')">${display}</div>`;
+  }).join('');
+  return `<div class="grid-2x2 question-answer">${cells}</div>`;
+}
+
+function renderRow(row, index, isQuestion) {
+  const label = isQuestion ? '第三行' : `第${index + 1}行`;
+  const g1 = renderGrid(row.grid1);
+  const g2 = renderGrid(row.grid2);
+  const g3 = isQuestion
+    ? renderAnswerGrid()
+    : renderGrid(row.grid3, 'demo-answer');
+
+  return `<div class="puzzle-row">
+    <div class="row-label">${label}</div>
+    ${g1}
+    ${g2}
+    <span class="arrow">\u2192</span>
+    ${g3}
+  </div>`;
+}
+
+function renderPuzzle() {
+  const puzzle = gameState.puzzle;
+  const container = document.getElementById('puzzle-container');
+  let html = '';
+  html += renderRow(puzzle.rows[0], 0, false);
+  html += renderRow(puzzle.rows[1], 1, false);
+  html += renderRow(puzzle.rows[2], 2, true);
+  container.innerHTML = html;
+}
+
+function renderOptions() {
+  const container = document.getElementById('options-grid');
+  const nums = ['\u2460','\u2461','\u2462','\u2463','\u2464','\u2465','\u2466','\u2467'];
+  container.innerHTML = gameState.puzzle.options.map((opt, i) => {
+    const selected = gameState.selectedOptionId === opt.id ? ' selected' : '';
+    const used = gameState.usedOptionIds.has(opt.id) ? ' used' : '';
+    return `<div class="option-card${selected}${used}" data-id="${opt.id}" onclick="handleOptionClick('${opt.id}')">
+      <span class="option-emoji">${opt.emoji}</span>
+      <span class="option-num">${nums[i]}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateSubmitButton() {
+  const btn = document.getElementById('submit-btn');
+  const allFilled = POSITIONS.every(p => gameState.userAnswer[p] !== null);
+  btn.disabled = !allFilled || gameState.submitted;
+  btn.classList.toggle('active', allFilled && !gameState.submitted);
+  if (gameState.submitted && gameState.isCorrect) {
+    btn.textContent = '再来一题';
+    btn.disabled = false;
+    btn.classList.add('active');
+    btn.onclick = handleNewPuzzle;
+  } else {
+    btn.textContent = '提交答案';
+    btn.onclick = handleSubmit;
+  }
+}
+
+function updateUI() {
+  renderPuzzle();
+  renderOptions();
+  updateSubmitButton();
+}
+
+// ============ Interaction Handlers ============
+
+function handleOptionClick(optId) {
+  if (gameState.submitted) return;
+  if (gameState.usedOptionIds.has(optId)) return;
+
+  if (gameState.selectedOptionId === optId) {
+    gameState.selectedOptionId = null;
+  } else {
+    gameState.selectedOptionId = optId;
+  }
+  updateUI();
+}
+
+function handleSlotClick(pos) {
+  if (gameState.submitted) return;
+
+  const currentEmoji = gameState.userAnswer[pos];
+
+  if (currentEmoji !== null) {
+    // Remove from slot, return to options
+    const opt = gameState.puzzle.options.find(o => o.emoji === currentEmoji && gameState.usedOptionIds.has(o.id));
+    if (opt) gameState.usedOptionIds.delete(opt.id);
+    gameState.userAnswer[pos] = null;
+    updateUI();
+    return;
+  }
+
+  if (gameState.selectedOptionId === null) return;
+
+  const selectedOpt = gameState.puzzle.options.find(o => o.id === gameState.selectedOptionId);
+  if (!selectedOpt) return;
+
+  gameState.userAnswer[pos] = selectedOpt.emoji;
+  gameState.usedOptionIds.add(selectedOpt.id);
+  gameState.selectedOptionId = null;
+  updateUI();
+}
+
+function handleSubmit() {
+  if (gameState.submitted && gameState.isCorrect) {
+    handleNewPuzzle();
+    return;
+  }
+
+  const answer = gameState.puzzle.answerGrid;
+  let allCorrect = true;
+  for (const p of POSITIONS) {
+    if (gameState.userAnswer[p] !== answer[p]) {
+      allCorrect = false;
+    }
+  }
+
+  gameState.submitted = true;
+  gameState.isCorrect = allCorrect;
+  updateUI();
+
+  const fb = document.getElementById('feedback');
+  const hint = document.getElementById('hint');
+
+  if (allCorrect) {
+    fb.className = 'feedback correct';
+    fb.textContent = '太棒了! 完全正确!';
+    hint.textContent = '';
+    createConfetti();
+  } else {
+    const correctCount = POSITIONS.filter(p => gameState.userAnswer[p] === answer[p]).length;
+    fb.className = 'feedback wrong';
+    fb.textContent = `还差一点! ${correctCount}/4 个位置正确`;
+    hint.textContent = '2秒后可以重试...';
+    setTimeout(() => {
+      resetAnswer();
+      fb.textContent = '';
+      hint.textContent = '再仔细观察一下规律吧';
+    }, 2000);
+  }
+}
+
+function resetAnswer() {
+  gameState.userAnswer = { TL: null, TR: null, BL: null, BR: null };
+  gameState.usedOptionIds.clear();
+  gameState.selectedOptionId = null;
+  gameState.submitted = false;
+  gameState.isCorrect = false;
+  updateUI();
+}
+
+function handleNewPuzzle() {
+  let puzzle;
+  let attempts = 0;
+  do {
+    puzzle = generatePuzzle();
+    attempts++;
+  } while (!validatePuzzle(puzzle) && attempts < 10);
+
+  gameState = {
+    puzzle,
+    selectedOptionId: null,
+    userAnswer: { TL: null, TR: null, BL: null, BR: null },
+    usedOptionIds: new Set(),
+    submitted: false,
+    isCorrect: false,
+  };
+
+  const fb = document.getElementById('feedback');
+  const hint = document.getElementById('hint');
+  fb.textContent = '';
+  fb.className = 'feedback';
+  hint.textContent = '观察前两行的规律，找出第三行答案格中应该填什么图案';
+
+  const container = document.getElementById('puzzle-container');
+  container.style.animation = 'none';
+  container.offsetHeight; // trigger reflow
+  container.style.animation = 'fadeIn 0.3s ease-out';
+
+  updateUI();
+}
+
+// ============ Confetti Effect ============
+function createConfetti() {
+  const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#FF9800'];
+  for (let i = 0; i < 40; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.top = '-10px';
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.animationDelay = Math.random() * 0.5 + 's';
+    el.style.animationDuration = (1 + Math.random()) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }
+}
+
+// ============ Init ============
+function init() {
+  handleNewPuzzle();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
