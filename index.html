@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>图形推理挑战</title>
+<title>图形推理练习</title>
 <style>
   :root {
     --grid-size: 60px;
@@ -404,7 +404,7 @@
 <body>
 
 <div class="header">
-  <h1>图形推理挑战</h1>
+  <h1>图形推理练习</h1>
   <button class="btn btn-refresh" onclick="handleNewPuzzle()" title="换一题">换一题</button>
 </div>
 
@@ -430,7 +430,7 @@
 <div id="feedback" class="feedback"></div>
 <div id="hint" class="hint-text"></div>
 
-<div class="version-footer">v1.0.0</div>
+<div class="version-footer">v1.0.1</div>
 
 <script>
 // ============ Constants ============
@@ -877,22 +877,17 @@ function updateTimerUI() {
   progress.style.width = percent + '%';
   timerText.textContent = Math.ceil(gameState.timeLeft) + '秒';
   
-  // Change emoji at 45 seconds
-  if (gameState.timeLeft <= 45) {
+  // Change emoji at last 15 seconds
+  if (gameState.timeLeft <= 15) {
     timerEmoji.textContent = '🐰';
     timerEmoji.classList.add('hurry');
-    progress.classList.add('warning');
-    progress.classList.remove('danger');
+    progress.classList.add('danger');
+    progress.classList.remove('warning');
   } else {
     timerEmoji.textContent = '🐢';
     timerEmoji.classList.remove('hurry');
     progress.classList.remove('warning');
     progress.classList.remove('danger');
-  }
-  
-  if (gameState.timeLeft <= 15) {
-    progress.classList.add('danger');
-    progress.classList.remove('warning');
   }
 }
 
