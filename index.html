@@ -265,19 +265,21 @@
 
   /* Timer */
   .timer-container {
-    margin-top: 16px;
+    margin-bottom: 20px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    justify-content: center;
   }
 
   .timer-label {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 16px;
     color: #5D4037;
+    white-space: nowrap;
   }
 
   .timer-emoji {
@@ -399,6 +401,16 @@
   <button class="btn btn-refresh" onclick="handleNewPuzzle()" title="换一题">换一题</button>
 </div>
 
+<div id="timer-container" class="timer-container">
+  <div class="timer-label">
+    <span id="timer-emoji" class="timer-emoji">🐢</span>
+    <span id="timer-text" class="timer-text">45秒</span>
+  </div>
+  <div class="timer-bar">
+    <div id="timer-progress" class="timer-progress"></div>
+  </div>
+</div>
+
 <div id="puzzle-container" class="puzzle-container"></div>
 
 <div class="options-section">
@@ -407,16 +419,6 @@
 </div>
 
 <button id="submit-btn" class="btn btn-submit" disabled onclick="handleSubmit()">提交答案</button>
-
-<div id="timer-container" class="timer-container">
-  <div class="timer-label">
-    <span id="timer-emoji" class="timer-emoji">🐢</span>
-    <span id="timer-text" class="timer-text">40秒</span>
-  </div>
-  <div class="timer-bar">
-    <div id="timer-progress" class="timer-progress"></div>
-  </div>
-</div>
 
 <div id="feedback" class="feedback"></div>
 <div id="hint" class="hint-text"></div>
@@ -429,11 +431,28 @@ const POSITIONS = ['TL', 'TR', 'BL', 'BR'];
 const EMOJIS = [
   '🍎', '🍏', '🦊', '🐺', '🐧', '🐥', '🌸', '🌺',
   '🎺', '🎷', '🍊', '🍑', '🐸', '🐢', '🦋', '🐛',
-  '🌻', '🌼', '🍓', '🍒', '🚀', '🚁', '🎸', '🎻',
+  '🌻', '🍓', '🍒', '🚀', '🚁', '🎸', '🎻',
   '🍋', '🍐', '🐱', '🐯', '🐶', '🐻', '🎈', '🎀',
   '🦜', '🦩', '🌶️', '🥕', '🎵', '🎶', '🍔', '🌮',
   '🚗', '🚕', '📘', '📗', '🧩', '🎲', '🍦', '🧁',
 ];
+
+// Emojis excluded from specific transforms (look too similar after transformation)
+const TRANSFORM_EXCLUDED_EMOJIS = {
+  'mirror-x': [
+    // Left-right symmetric: flipping horizontally looks nearly identical
+    '🍎', '🍏','🦊', '🐥', '🌻', '🦋', '🐱', '🐯', '🐶', '🐻', '🎀', '🍦','🌺','🧁','🐸'
+  ],
+  'mirror-y': [
+    // Top-bottom symmetric: flipping vertically looks nearly identical
+    '📘', '📗',
+  ],
+  'rotate-90': [
+    // Rotationally symmetric: rotated 90° looks nearly identical
+    '🌸',
+  ],
+  // 'shrink' has no exclusions — size change is always visible
+};
 
 // All 6 four-cycles on positions {TL=0, TR=1, BL=2, BR=3}
 const FOUR_CYCLES = [
@@ -452,23 +471,6 @@ const VISUAL_TRANSFORMS = [
   { id: 'rotate-90', cssClass: 'vt-rotate-90', label: '顺时针旋转90°' },
   { id: 'mirror-y', cssClass: 'vt-mirror-y', label: '上下镜像' },
 ];
-
-// Emojis excluded from specific transforms (look too similar after transformation)
-const TRANSFORM_EXCLUDED_EMOJIS = {
-  'mirror-x': [
-    // Left-right symmetric: flipping horizontally looks nearly identical
-    '🍎', '🦊', '🐥', '🌻', '🦋', '🐱', '🐯', '🐶', '🐻', '🎀', '🍦','🌺','🧁'
-  ],
-  'mirror-y': [
-    // Top-bottom symmetric: flipping vertically looks nearly identical
-    '📘', '📗',
-  ],
-  'rotate-90': [
-    // Rotationally symmetric: rotated 90° looks nearly identical
-    '🌸', '🌼', '🎲',
-  ],
-  // 'shrink' has no exclusions — size change is always visible
-};
 
 // ============ Utility Functions ============
 function shuffle(arr) {
@@ -608,8 +610,14 @@ function generatePuzzle() {
       // Correct has a transform → confuser is the normal (untransformed) version
       confuserTransform = null;
     } else {
-      // Correct is normal → confuser has a random transform applied
-      confuserTransform = VISUAL_TRANSFORMS[Math.floor(Math.random() * VISUAL_TRANSFORMS.length)];
+      // Correct is normal → confuser has a random compatible transform applied
+      const compatibleTransforms = VISUAL_TRANSFORMS.filter(t => isEmojiCompatible(emoji, t.id));
+      if (compatibleTransforms.length > 0) {
+        confuserTransform = compatibleTransforms[Math.floor(Math.random() * compatibleTransforms.length)];
+      } else {
+        // No compatible transforms, use normal (same as correct — rare edge case)
+        confuserTransform = null;
+      }
     }
     const confuserId = `opt_${optIdx++}`;
     options.push({
@@ -654,7 +662,7 @@ let gameState = {
   usedOptionIds: new Set(),
   submitted: false,
   isCorrect: false,
-  timeLeft: 40,
+  timeLeft: 45,
   timerInterval: null,
 };
 
@@ -766,9 +774,12 @@ function renderOptions() {
   // Check if options are already rendered
   const existingCards = container.querySelectorAll('.option-card');
   if (existingCards.length === gameState.puzzle.options.length && !gameState.submitted) {
-    // Incremental update: just update classes
-    existingCards.forEach((card, i) => {
-      const opt = gameState.puzzle.options[i];
+    // Incremental update: match by data-id instead of index
+    existingCards.forEach((card) => {
+      const optId = card.getAttribute('data-id');
+      const opt = gameState.puzzle.options.find(o => o.id === optId);
+      if (!opt) return;
+      
       const isSelected = gameState.selectedOptionId === opt.id;
       const isUsed = gameState.usedOptionIds.has(opt.id);
       
@@ -821,7 +832,7 @@ function updateUI() {
 
 function startTimer() {
   stopTimer();
-  gameState.timeLeft = 40;
+  gameState.timeLeft = 45;
   updateTimerUI();
   
   gameState.timerInterval = setInterval(() => {
@@ -851,12 +862,12 @@ function updateTimerUI() {
   
   if (!progress || !timerText || !timerEmoji) return;
   
-  const percent = (gameState.timeLeft / 40) * 100;
+  const percent = (gameState.timeLeft / 45) * 100;
   progress.style.width = percent + '%';
   timerText.textContent = Math.ceil(gameState.timeLeft) + '秒';
   
-  // Change emoji at 20 seconds
-  if (gameState.timeLeft <= 20) {
+  // Change emoji at 30 seconds
+  if (gameState.timeLeft <= 30) {
     timerEmoji.textContent = '🐰';
     timerEmoji.classList.add('hurry');
     progress.classList.add('warning');
@@ -993,7 +1004,7 @@ function handleNewPuzzle() {
     usedOptionIds: new Set(),
     submitted: false,
     isCorrect: false,
-    timeLeft: 40,
+    timeLeft: 45,
     timerInterval: null,
   };
 
