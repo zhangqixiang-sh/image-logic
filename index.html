@@ -141,8 +141,9 @@
   .grid-2x2.question-answer .grid-cell {
     background: rgba(255,255,255,0.6);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background-color 0.08s ease-out, border-color 0.08s ease-out;
     min-height: var(--grid-size);
+    will-change: background-color, border-color;
   }
 
   .grid-2x2.question-answer .grid-cell:hover {
@@ -207,9 +208,10 @@
     border-radius: 10px;
     background: white;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: transform 0.08s ease-out, border-color 0.08s ease-out, box-shadow 0.08s ease-out, opacity 0.08s ease-out;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     position: relative;
+    will-change: transform, border-color, box-shadow;
   }
 
   .option-card:hover {
@@ -611,7 +613,7 @@ function renderGrid(grid, extraClass = '', grid3Transforms = null) {
 }
 
 function renderAnswerGrid() {
-  const ans = gameState.userAnswer; // stores option IDs
+  const ans = gameState.userAnswer;
   const puzzle = gameState.puzzle;
   const cells = POSITIONS.map(p => {
     const optId = ans[p];
@@ -626,6 +628,44 @@ function renderAnswerGrid() {
     return `<div class="grid-cell${filledClass}${feedbackClass}" data-pos="${p}" onclick="handleSlotClick('${p}')">${display}</div>`;
   }).join('');
   return `<div class="grid-2x2 question-answer">${cells}</div>`;
+}
+
+// Optimized incremental update for answer grid only
+function updateAnswerGrid() {
+  const ans = gameState.userAnswer;
+  const puzzle = gameState.puzzle;
+  const answerGridEl = document.querySelector('.grid-2x2.question-answer');
+  if (!answerGridEl) return false;
+  
+  const cells = answerGridEl.querySelectorAll('.grid-cell');
+  if (cells.length !== 4) return false;
+  
+  cells.forEach((cell, idx) => {
+    const pos = POSITIONS[idx];
+    const optId = ans[pos];
+    const opt = optId ? puzzle.options.find(o => o.id === optId) : null;
+    
+    // Update content if changed
+    const newDisplay = opt
+      ? wrapEmoji(opt.emoji, opt.transform)
+      : '<span class="question-mark">?</span>';
+    if (cell.innerHTML !== newDisplay) {
+      cell.innerHTML = newDisplay;
+    }
+    
+    // Update classes
+    cell.classList.toggle('filled', !!opt);
+    
+    if (gameState.submitted) {
+      const isCorrect = optId === puzzle.correctOptions[pos];
+      cell.classList.toggle('correct', isCorrect);
+      cell.classList.toggle('wrong', !isCorrect);
+    } else {
+      cell.classList.remove('correct', 'wrong');
+    }
+  });
+  
+  return true;
 }
 
 function renderRow(row, index, isQuestion) {
@@ -655,10 +695,26 @@ function renderPuzzle() {
 function renderOptions() {
   const container = document.getElementById('options-grid');
   const nums = ['\u2460','\u2461','\u2462','\u2463','\u2464','\u2465','\u2466','\u2467'];
+  
+  // Check if options are already rendered
+  const existingCards = container.querySelectorAll('.option-card');
+  if (existingCards.length === gameState.puzzle.options.length && !gameState.submitted) {
+    // Incremental update: just update classes
+    existingCards.forEach((card, i) => {
+      const opt = gameState.puzzle.options[i];
+      const isSelected = gameState.selectedOptionId === opt.id;
+      const isUsed = gameState.usedOptionIds.has(opt.id);
+      
+      card.classList.toggle('selected', isSelected);
+      card.classList.toggle('used', isUsed);
+    });
+    return;
+  }
+  
+  // Full render (initial or after submission)
   container.innerHTML = gameState.puzzle.options.map((opt, i) => {
     const selected = gameState.selectedOptionId === opt.id ? ' selected' : '';
     const used = gameState.usedOptionIds.has(opt.id) ? ' used' : '';
-    // Each option carries its own visual treatment (transform or null)
     const emojiDisplay = wrapEmoji(opt.emoji, opt.transform);
     return `<div class="option-card${selected}${used}" data-id="${opt.id}" onclick="handleOptionClick('${opt.id}')">
       <span class="option-emoji">${emojiDisplay}</span>
@@ -684,7 +740,11 @@ function updateSubmitButton() {
 }
 
 function updateUI() {
-  renderPuzzle();
+  // Try incremental update first for better performance
+  if (!updateAnswerGrid()) {
+    // Fallback to full render if answer grid doesn't exist
+    renderPuzzle();
+  }
   renderOptions();
   updateSubmitButton();
 }
