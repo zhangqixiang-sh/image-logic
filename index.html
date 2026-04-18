@@ -632,7 +632,6 @@ function renderAnswerGrid() {
 }
 
 function renderRow(row, index, isQuestion) {
-  const label = isQuestion ? '第三行' : `第${index + 1}行`;
   const g1 = renderGrid(row.grid1);
   const g2 = renderGrid(row.grid2);
   const g3 = isQuestion
@@ -640,10 +639,8 @@ function renderRow(row, index, isQuestion) {
     : renderGrid(row.grid3, 'demo-answer', row.grid3Transforms);
 
   return `<div class="puzzle-row">
-    <div class="row-label">${label}</div>
     ${g1}
     ${g2}
-    <span class="arrow">\u2192</span>
     ${g3}
   </div>`;
 }
